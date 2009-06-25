@@ -15,7 +15,7 @@
  */
 package org.scala_libs.jdo
 
-import javax.jdo.{JDOHelper, PersistenceManager}
+import javax.jdo.PersistenceManager
 
 trait ScalaPersistenceManager {
 
@@ -23,19 +23,5 @@ trait ScalaPersistenceManager {
 
   val factory : ScalaPMFactory 
 
-  def from[A](c:Class[A]) = new ScalaQuery[A](pm, c)
-
-/*
-  def findAll[A](queryName : String, params : Pair[String,Any]*) = 
-    createAndParamify[A](queryName, params).findAll
-  private def createAndParamify[A](queryName : String, 
-                                   params : Seq[Pair[String,Any]]) : ScalaQuery[A] = {
-    val q = createNamedQuery[A](queryName)
-    params.foreach{ case (p1, p2) => q.setParameter(p1, p2)}
-    q
-  } 
-  def createNamedQuery[A](queryName : String, params : Pair[String,Any]*) : ScalaQuery[A] = createAndParamify[A](queryName,params)
-  def createNamedQuery[A](queryName: String) = 
-    new ScalaQuery[A](pm.createNamedQuery(queryName)) 
-*/
+  def from[A](pm:PersistenceManager, c:Class[A]) = new ScalaQuery[A](pm, c)
 }

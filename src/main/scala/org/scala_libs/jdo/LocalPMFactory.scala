@@ -18,31 +18,40 @@ package org.scala_libs.jdo
 
 import javax.jdo.{JDOHelper, PersistenceManager}
 
-class LocalPMFactory(val unitName : String, val userTx : Boolean) 
+class LocalPMFactory(val unitName : String) 
   extends ScalaPMFactory {
 
-  def this(unitName : String) = this(unitName, false)
- 
   private val pmf = JDOHelper.getPersistenceManagerFactory(unitName)
  
   def openPM () = {
-    val pm = pmf.getPersistenceManager
- 
-//  if (!userTx) { pm.getTransaction.begin() }
- 
-    pm
+    pmf.getPersistenceManager
   }
  
   def closePM (pm : PersistenceManager) = {
-/*
-    if (!userTx) {
-      if (pm.getTransaction.getRollbackOnly) {
-        pm.getTransaction.rollback()
-      } else {
-        pm.getTransaction.commit()
-      }
-    }
-*/
     pm.close()
   }
+
+  def finallyClosePM[A](f: PersistenceManager => A):A={
+    val _pm = openPM
+    try{ f(_pm) }
+    finally{ closePM(_pm) }   
+  }
+
+  def finallyClosePMinTX[A](f: PersistenceManager => A):A={
+    val _pm = openPM
+    val tx = _pm.currentTransaction
+    try{ 
+      tx.begin
+      val a = f(_pm) 
+      tx.commit
+      a
+    }
+    finally{
+      if(tx.isActive){
+        tx.rollback
+      }
+      closePM(_pm) 
+    }   
+  }
+
 }

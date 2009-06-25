@@ -15,7 +15,7 @@
  */
 package org.scala_libs.jdo
 
-import javax.jdo.{JDOHelper, PersistenceManager}
+import javax.jdo.PersistenceManager
 
 trait ScalaPMFactory {
 

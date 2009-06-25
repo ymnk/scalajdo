@@ -17,56 +17,55 @@ package org.scala_libs.jdo
 
 import javax.jdo._
 import _root_.scala.collection.jcl.Conversions.convertList
-import _root_.scala.collection.mutable.Set
+import _root_.scala.collection.mutable.Queue
 import _root_.java.util.Arrays
 import _root_.java.util.{List => JList}
+import _root_.org.scala_libs.jdo.criterion.{FilterCriterion, OrderCriterion}
+
+object ScalaQuery{
+  def toOption[A](a:A):Option[A] = a match{
+    case null => None
+    case a => Some(a)
+  }
+}
 
 class ScalaQuery[A](val pm:PersistenceManager, val clss:Class[A]){
 
-  private val filterCriteria = Set.empty[FilterCriterion]
-  private val orderCriteria = Set.empty[OrderCriterion]
+  import ScalaQuery._
+
+  private val filterCriteria = new Queue[FilterCriterion]
+  private val orderCriteria = new Queue[OrderCriterion]
   private var rangeIndex:Option[(Long, Long)] = None
   private var _timeoutMillis:Option[Int] = None
 
-  def findAll = getResultList()
-
-  def getResultList() = {
-    val q = newQuery
-    try{
-      convertList[A](q.executeWithArray(parameters:_*).asInstanceOf[JList[A]])
-    }
-    finally{
-      q.closeAll
-    }
+  def resultList() = finallyClose{ q =>
+    convertList[A](q.executeWithArray(parameters:_*).asInstanceOf[JList[A]]).toList
   }
 
   def findOne():Option[A] = toOption(getSingleResult)
 
-  private def toOption[A](a:A):Option[A] = a match{
-    case null => None
-    case a => Some(a)
+  def getSingleResult():A = finallyClose{ query =>
+    query.setUnique(true)
+    query.executeWithArray(parameters:_*).asInstanceOf[A]
   }
 
-  def getSingleResult() = {
-    val query = newQuery
-    try{
-      query.setUnique(true)
-      query.executeWithArray(parameters:_*).asInstanceOf[A]
-    }
-    finally{
-      query.closeAll
-    }
-  }
-
-  def getFirstResult():Option[A] ={
+  def getFirstResult():Option[A] = {
     range(0, 1)
-    getResultList match{
+    resultList match{
       case l if l.size==0 => None
       case l => Some(l(0))
     }
   }
 
-  def newQuery={
+  private def finallyClose[A](f: Query =>A):A = {
+    val query = newQuery
+    try{ f(query) }
+    finally{
+      query.closeAll
+    }
+  }
+
+  def newQuery = {
     val query = pm.newQuery(clss)
     filter match{
       case "" =>
@@ -88,12 +87,12 @@ class ScalaQuery[A](val pm:PersistenceManager, val clss:Class[A]){
   }
 
   def where(criteria:FilterCriterion *) = {
-    filterCriteria ++ criteria
+    filterCriteria ++= criteria
     this
   }
 
   def orderBy(criteria:OrderCriterion *) = {
-    orderCriteria ++ criteria
+    orderCriteria ++= criteria
     this
   }
 
@@ -107,25 +106,25 @@ class ScalaQuery[A](val pm:PersistenceManager, val clss:Class[A]){
     this
   }
 
-  private def parameters() ={
-    filterCriteria.map(_.parameter).toList.toArray
+  private def parameters() = {
+    filterCriteria.map(_.parameter).toArray
   } 
 
-  private def filter()={
+  private def filter() = {
     filterCriteria.toList.zipWithIndex.map{
       case (f, i) => f.queryString(":"+i)
     }.mkString(" && ")
   }
 
-  private def ordering()={
+  private def ordering() = {
     orderCriteria.toList.map(_.queryString()).mkString(", ")
   }
 
-  def queryStringWithParameters()={
+  def queryStringWithParameters() = {
     queryString + " with " + Arrays.asList(parameters:_*)
   }
 
-  def queryString()={
+  def queryString() = {
     val sb = new StringBuilder
     sb.append("select from ").append(clss.getName)
     filter match{
