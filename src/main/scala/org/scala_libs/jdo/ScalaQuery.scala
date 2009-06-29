@@ -38,13 +38,15 @@ class ScalaQuery[A](val pm:PersistenceManager, val clss:Class[A]){
   private var rangeIndex:Option[(Long, Long)] = None
   private var _timeoutMillis:Option[Int] = None
 
-  def resultList() = finallyClose{ q =>
+  def resultList() = {
+    val q = newQuery
     convertList[A](q.executeWithArray(parameters:_*).asInstanceOf[JList[A]]).toList
   }
 
   def findOne():Option[A] = toOption(getSingleResult)
 
-  def getSingleResult():A = finallyClose{ query =>
+  def getSingleResult():A = {
+    val query = newQuery
     query.setUnique(true)
     query.executeWithArray(parameters:_*).asInstanceOf[A]
   }
@@ -54,14 +56,6 @@ class ScalaQuery[A](val pm:PersistenceManager, val clss:Class[A]){
     resultList match{
       case l if l.size==0 => None
       case l => Some(l(0))
-    }
-  }
-
-  private def finallyClose[A](f: Query =>A):A = {
-    val query = newQuery
-    try{ f(query) }
-    finally{
-      query.closeAll
     }
   }
 
